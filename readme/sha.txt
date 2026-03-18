@@ -1,0 +1,5 @@
+Compatibility branch: compat/mimicgen-stack
+Fork remote: https://github.com/jren03/robomimic
+Original upstream repo: https://github.com/ARISE-Initiative/robomimic
+Original upstream commit: d0b37cf214bd24fb590d182edb6384333f67b661
+Reason: MimicGen-compatible robomimic pin.

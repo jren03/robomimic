@@ -15,21 +15,8 @@ setup(
     packages=[
         package for package in find_packages() if package.startswith("robomimic")
     ],
-    install_requires=[
-        "numpy>=1.13.3",
-        "h5py",
-        "psutil",
-        "tqdm",
-        "termcolor",
-        "tensorboard",
-        "tensorboardX",
-        "imageio",
-        "imageio-ffmpeg",
-        "matplotlib",
-        "egl_probe>=1.0.1",
-        "torch",
-        "torchvision",
-    ],
+    # Dependencies are locked by the parent workspace.
+    install_requires=[],
     eager_resources=['*'],
     include_package_data=True,
     python_requires='>=3',
