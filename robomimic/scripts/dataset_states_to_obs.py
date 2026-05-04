@@ -206,12 +206,32 @@ def get_camera_info(
     return camera_info
 
 
-def dataset_states_to_obs(args):
+def dataset_states_to_obs(
+    args,
+    *,
+    demo_keys=None,
+    render_gpu_device_id_override=None,
+    copy_mask=True,
+    disable_progress=False,
+):
+    """
+    Args:
+        demo_keys: If set, only these ``data/demo_*`` groups are converted (parallel workers).
+        render_gpu_device_id_override: Applied to env_meta before env construction so workers
+            can share one read-only HDF5 without rewriting per-process ``env_args``.
+        copy_mask: When False, skip copying the ``mask`` group (partial shard outputs).
+        disable_progress: When True, skip tqdm over trajectories (parallel workers).
+    """
     if args.depth:
         assert len(args.camera_names) > 0, "must specify camera names if using depth"
 
     # create environment to use for data processing
     env_meta = FileUtils.get_env_metadata_from_dataset(dataset_path=args.dataset)
+    if render_gpu_device_id_override is not None:
+        env_meta = deepcopy(env_meta)
+        device_id = int(render_gpu_device_id_override)
+        assert device_id >= -1, device_id
+        env_meta["env_kwargs"]["render_gpu_device_id"] = device_id
     env = EnvUtils.create_env_for_data_processing(
         env_meta=env_meta,
         camera_names=args.camera_names, 
@@ -234,9 +254,18 @@ def dataset_states_to_obs(args):
     inds = np.argsort([int(elem[5:]) for elem in demos])
     demos = [demos[i] for i in inds]
 
-    # maybe reduce the number of demonstrations to playback
-    if args.n is not None:
-        demos = demos[:args.n]
+    if demo_keys is not None:
+        wanted = list(demo_keys)
+        demo_set = set(demos)
+        for key in wanted:
+            assert key in demo_set, (
+                "Unknown demo key for this dataset shard.",
+                key,
+                list(demos)[:5],
+            )
+        demos = sorted(wanted, key=lambda elem: int(elem.split("_")[1]))
+    elif args.n is not None:
+        demos = demos[: args.n]
 
     # output file in same directory as input file
     output_path = os.path.join(os.path.dirname(args.dataset), args.output_name)
@@ -246,7 +275,10 @@ def dataset_states_to_obs(args):
     print("output file: {}".format(output_path))
 
     total_samples = 0
-    for ind in tqdm(range(len(demos))):
+    traj_iter = range(len(demos))
+    if not disable_progress:
+        traj_iter = tqdm(range(len(demos)))
+    for ind in traj_iter:
         ep = demos[ind]
 
         # prepare initial state to reload from
@@ -307,7 +339,7 @@ def dataset_states_to_obs(args):
 
 
     # copy over all filter keys that exist in the original hdf5
-    if "mask" in f:
+    if copy_mask and "mask" in f:
         f.copy("mask", f_out)
 
     # global metadata
